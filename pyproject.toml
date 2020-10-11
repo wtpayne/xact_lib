@@ -1,0 +1,35 @@
+[tool.poetry]
+name        = "xact_lib"
+version     = "0.1.0"
+description = "Xact core component library."
+authors     = ["William Payne <will@xplain.systems>"]
+packages    = [{ include = "xact", from = "src" }]
+
+[tool.poetry.dependencies]
+python         = ">=3.6.1"
+xact           = { path = '/media/wtp/Data/dev/xact' }
+dominate       = "*"
+pyyaml         = "*"
+dill           = "*"
+loguru         = "*"
+sse_starlette  = "*"
+starlette      = "*"
+itsdangerous   = "*"
+uvicorn        = ">=0.11"
+matplotlib     = "*"
+scikit-build   = "*"
+scikit-image   = "*"
+opencv-python  = "*"
+# opencv-python  = { path = "/usr/lib/python3.6/dist-packages/cv2/python-3.6" }
+pillow         = "*"
+torch          = "^1.6.0"
+networkx       = "^2.4"
+
+# pygsheets         = "^2.0.3"
+# pyaudio           = "^0.2.11"
+# SpeechRecognition = "^3.8.1"
+
+[tool.poetry.dev-dependencies]
+[build-system]
+requires      = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
