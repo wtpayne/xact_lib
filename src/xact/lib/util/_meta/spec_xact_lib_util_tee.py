@@ -5,7 +5,6 @@ Functional specification for xact tee.
 """
 
 
-import xact.cfg.builder
 import xact.lib.test.component
 
 
@@ -21,7 +20,7 @@ class SpecifyTee:
         Test that the tee component duplicates outputs.
 
         """
-        cfg = xact.lib.test.component.chain_test(
+        cfg = xact.lib.test.component.pipeline_test(
                 list_pipeline_modules = [
                         'xact.lib.util.tee'],
                 list_id_node_nocontrol = [

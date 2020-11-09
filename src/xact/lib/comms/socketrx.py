@@ -5,7 +5,7 @@ Xact component for UDP data reception.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the udprx component.

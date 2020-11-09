@@ -8,7 +8,7 @@ Xact component for UDP data transmission.
 import socket
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the udptx component.

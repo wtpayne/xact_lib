@@ -5,7 +5,6 @@ Functional specification for the xact data unpacker component.
 """
 
 
-import xact.cfg.builder
 import xact.lib.test.component
 
 
@@ -21,7 +20,7 @@ class SpecifyUnpacker:
         Test that the packer component packs data.
 
         """
-        cfg = xact.lib.test.component.chain_test(
+        cfg = xact.lib.test.component.pipeline_test(
                 list_pipeline_modules = [
                         'xact.lib.util.unpacker'],
                 list_pipeline_node_config = [

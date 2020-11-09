@@ -9,7 +9,7 @@ import re
 import sqlite3
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the sqlite writer node.

@@ -5,7 +5,7 @@ Xact component for simulating unreliable communications of some sort.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the unreliable_comms simulation component.

@@ -11,7 +11,7 @@ import time
 import xact.sys.exception
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the controller.

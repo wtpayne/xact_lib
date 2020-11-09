@@ -22,7 +22,7 @@ class SpecifyObfuscator:
         Round trip test for the obfuscator component.
 
         """
-        cfg = xact.lib.test.component.chain_test(
+        cfg = xact.lib.test.component.pipeline_test(
                 list_pipeline_modules = [
                         'xact.lib.util.packer',
                         'xact.lib.encryption.obfuscator',

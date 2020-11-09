@@ -17,7 +17,7 @@ import dill
 import xact.lib.measurement
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the data recorder.

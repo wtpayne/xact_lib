@@ -8,7 +8,7 @@ Xact component to pack data.
 import struct
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the data packer.

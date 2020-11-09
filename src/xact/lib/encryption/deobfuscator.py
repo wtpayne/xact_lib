@@ -8,7 +8,7 @@ Xact component to deobfuscate data.
 import Crypto.Cipher
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the data deobfuscator.

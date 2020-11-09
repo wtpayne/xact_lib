@@ -1,0 +1,528 @@
+system:
+  id_system: demo_watchdog
+
+
+###############################################################################
+host:
+  localhost:
+    hostname:        'localhost'
+    acct_run:        'wtp'
+    acct_provision:  'wtp'
+    port_range:      '8090-9000'
+    dirpath_log:     '/var/log/xact'
+    dirpath_install: '/home/wtp/dev/xact/'
+    dirpath_venv:    '/home/wtp/dev/venv/'    # /opt/xact
+    log_level:       'TRACE'
+
+
+###############################################################################
+process:
+  control_process:
+    host: localhost
+  pycodestyle_process:
+    host: localhost
+  pydocstyle_process:
+    host: localhost
+  pycomplexity_process:
+    host: localhost
+  pysecurity_process:
+    host: localhost
+  pylint_process:
+    host: localhost
+  pytype_process:
+    host: localhost
+  report_process:
+    host: localhost
+
+
+###############################################################################
+node:
+
+  # ---------------------------------------------------------------------------
+  controller:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.simple_controller
+    state_type:     py_dict
+    config:
+      frequency_hz: 10
+
+  # ---------------------------------------------------------------------------
+  controller_tee:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.tee
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  watchdog:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.fs.watchdog
+    state_type:     py_dict
+    config:
+      dirpath_root: /media/wtp/Data/dev/xact_lib/
+      recursive:    True
+
+  # ---------------------------------------------------------------------------
+  walk:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.fs.walk
+    state_type:     py_dict
+    config:
+      dirpath_root: /media/wtp/Data/dev/xact_lib/
+      size_batch:   10
+      direxcl:
+        - !regex '^\..*$'
+        - !regex '^.*\.egg-info$'
+        - !regex '^.pytest-cache$'
+        - !regex '^\.cache$'
+        - !regex '^\.git$'
+        - !regex '^\.tox$'
+        - !regex '^\.vagrant$'
+        - !regex '^__pycache__$'
+      pathincl:
+        - !regex '^.*.py$'
+      do_repeat:    True
+      do_halt:      False
+
+  # ---------------------------------------------------------------------------
+  # Sequence/load/distribute pipeline.
+  sequencer:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.sequencer
+    state_type:     py_dict
+    config:
+      size_batch:   10
+
+  # ---------------------------------------------------------------------------
+  loader:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.loader
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  distributor:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.distributor
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  # Python processing pipeline
+  pyparse:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pyparse
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  python_processing_tee:
+    process:        control_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.tee
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  # Several whitespace related rules are relaxed
+  # to permit the vertical alignment of operators
+  # and operands on consecutive lines. This allows
+  # us to visually group related statements and
+  # to readily identify discrepanices.
+  #
+  pycodestyle:
+    process:        pycodestyle_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pycodestyle
+    state_type:     py_dict
+    config:
+      list_ignore:
+        - 'E126'  # Allow semantically meaningful indentation.
+        - 'E127'  # Allow semantically meaningful indentation.
+        - 'E128'  # Allow semantically meaningful indentation.
+        - 'E201'  # Allow vertically aligned parameters.
+        - 'E202'  # Allow vertically aligned parameters.
+        - 'E221'  # Allow vertically aligned sequence of assignment statements.
+        - 'E241'  # Allow vertically aligned dictionary values.
+        - 'E251'  # Allow vertically aligned keyword/parameter assignment.
+        - 'E272'  # Allow vertically aligned if x in y statements.
+        - 'W503'  # Allow operators on LHS as per math convention.
+
+  # ---------------------------------------------------------------------------
+  pydocstyle:
+    process:        pydocstyle_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pydocstyle
+    state_type:     py_dict
+    config:
+      list_ignore:
+        - 'D200'  # Rule D200 (One-line docstring should
+                  # fit on one line) has been disabled so
+                  # a uniform formatting can be applid to
+                  # docstrings irrespective of length.
+                  # (I.e. triple-quoted docstrings with
+                  # quotes on separate lines).
+        - 'D203'  # Rule D203 (1 blank line required before
+                  # class docstring) has been disabled
+                  # because it contradicts with rule D211
+                  # (No blank lines allowed before class
+                  # docstring), and it was felt that a
+                  # uniform format for both class and
+                  # function docstrings was desirable.
+        - 'D212'  # Rule D212 (Multi-line docstring summary
+                  # should start at the first line) has been
+                  # disabled so that we can put a pep263
+                  # encoding marker above the docstring.
+                  # Rule D213 (Multi-line docstring summary
+                  # should start at the second line) has
+                  # been left enabled.
+
+  # ---------------------------------------------------------------------------
+  pycomplexity:
+    process:        pycomplexity_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pycomplexity
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  pysecurity:
+    process:        pysecurity_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pysecurity
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  pylint:
+    process:        pylint_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pylint
+    state_type:     py_dict
+    config:
+      args:
+        design:
+          - '--disable=C0326'  # bad-whitespace      - Vertical alignment.
+          - '--disable=C0330'  # bad-continuation    - Vertical alignment.
+          - '--disable=W0311'  # bad-indentation     - Vertical alignment.
+          - '--disable=I0011'  # locally-disabled    - TBD
+          - '--disable=I0012'  # locally-enabled     - TBD
+          - '--disable=I0020'  # suppressed-message  - TBD
+          - '--disable=W0511'  # fixme               - TBD
+          - '--disable=E1129'  # not-context-manager - False alarms?
+          - '--disable=E0401'  # import-error        - False alarms?
+          - '--disable=W0622'  # redefined-builtin   - False alarms?
+
+  # ---------------------------------------------------------------------------
+  pytype:
+    process:        pytype_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pytype
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  # (Non)conformity reporting nodes
+  nonconformity_merge:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.merge_list
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  conformity_merge:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.merge_list
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  nonconformity_reporter:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.reporter
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  pydesigndoc:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.pydesigndoc
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  collapsible_doc:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.collapsible_doc
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  resource_merge:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.merge_list
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  webserver:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.web.server
+    state_type:     py_dict
+    config:
+      host:         0.0.0.0
+      port:         8080
+      session_key:  7A8F&+ey789dfgh+32d233shja67s843g1
+      debug:        False
+
+
+###############################################################################
+edge:
+- owner: controller
+  data:  py_dict
+  src:   controller.outputs.clock
+  dst:   controller_tee.inputs.clock
+
+- owner: controller_tee
+  data:  py_dict
+  src:   controller_tee.outputs.clock_00
+  dst:   watchdog.inputs.clock
+
+- owner: controller_tee
+  data:  py_dict
+  src:   controller_tee.outputs.clock_01
+  dst:   walk.inputs.clock
+
+- owner: controller_tee
+  data:  py_dict
+  src:   controller_tee.outputs.clock_02
+  dst:   sequencer.inputs.clock
+
+- owner: watchdog
+  data:  py_dict
+  src:   watchdog.outputs.filepath
+  dst:   sequencer.inputs.high_priority
+
+- owner: walk
+  data:  py_dict
+  src:   walk.outputs.filepath
+  dst:   sequencer.inputs.low_priority
+
+- owner: sequencer
+  data:  py_dict
+  src:   sequencer.outputs.filepath
+  dst:   loader.inputs.filepath
+
+- owner: loader
+  data:  py_dict
+  src:   loader.outputs.content
+  dst:   distributor.inputs.content
+
+- owner: distributor
+  data:  py_dict
+  src:   distributor.outputs.python
+  dst:   pyparse.inputs.content
+
+# Python processing pipeline - fan out
+- owner: pyparse
+  data:  py_dict
+  src:   pyparse.outputs.content
+  dst:   python_processing_tee.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_00
+  dst:   pycodestyle.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_01
+  dst:   pydocstyle.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_02
+  dst:   pycomplexity.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_03
+  dst:   pysecurity.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_04
+  dst:   pylint.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_05
+  dst:   pytype.inputs.content
+
+- owner: python_processing_tee
+  data:  py_dict
+  src:   python_processing_tee.outputs.content_06
+  dst:   pydesigndoc.inputs.content
+
+# Nonconformity report merging
+- owner: loader
+  data:  py_dict
+  src:   loader.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_01
+
+- owner: pyparse
+  data:  py_dict
+  src:   pyparse.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_02
+
+- owner: pycodestyle
+  data:  py_dict
+  src:   pycodestyle.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_03
+
+- owner: pydocstyle
+  data:  py_dict
+  src:   pydocstyle.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_04
+
+- owner: pycomplexity
+  data:  py_dict
+  src:   pycomplexity.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_05
+
+- owner: pysecurity
+  data:  py_dict
+  src:   pysecurity.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_06
+
+- owner: pylint
+  data:  py_dict
+  src:   pylint.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_07
+
+- owner: pytype
+  data:  py_dict
+  src:   pytype.outputs.nonconformity
+  dst:   nonconformity_merge.inputs.nonconformity_08
+
+- owner: nonconformity_merge
+  data:  py_dict
+  src:   nonconformity_merge.outputs.nonconformity
+  dst:   nonconformity_reporter.inputs.nonconformity
+
+# Conforming document report merging
+- owner: loader
+  data:  py_dict
+  src:   loader.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_01
+
+- owner: pyparse
+  data:  py_dict
+  src:   pyparse.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_02
+
+- owner: pycodestyle
+  data:  py_dict
+  src:   pycodestyle.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_03
+
+- owner: pydocstyle
+  data:  py_dict
+  src:   pydocstyle.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_04
+
+- owner: pycomplexity
+  data:  py_dict
+  src:   pycomplexity.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_05
+
+- owner: pysecurity
+  data:  py_dict
+  src:   pysecurity.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_06
+
+- owner: pylint
+  data:  py_dict
+  src:   pylint.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_07
+
+- owner: pytype
+  data:  py_dict
+  src:   pytype.outputs.conformity
+  dst:   conformity_merge.inputs.conformity_08
+
+- owner: conformity_merge
+  data:  py_dict
+  src:   conformity_merge.outputs.conformity
+  dst:   nonconformity_reporter.inputs.conformity
+
+# Nonconformity reporting
+- owner: nonconformity_reporter
+  data:  py_dict
+  src:   nonconformity_reporter.outputs.documents
+  dst:   collapsible_doc.inputs.documents
+
+- owner: collapsible_doc
+  data:  py_dict
+  src:   collapsible_doc.outputs.resources
+  dst:   resource_merge.inputs.resources_00
+
+- owner: pydesigndoc
+  data:  py_dict
+  src:   pydesigndoc.outputs.resources
+  dst:   resource_merge.inputs.resources_01
+
+- owner: resource_merge
+  data:  py_dict
+  src:   resource_merge.outputs.resources
+  dst:   webserver.inputs.resources
+
+
+###############################################################################
+data:
+  py_dict:  py_dict
+  py_str:   py_str
+
+
+###############################################################################
+req_host_cfg:
+  default_configuration:
+    role:
+      - default_role
+
+
+###############################################################################
+role:
+  default_role:
+    tasks:
+      - name: Update apt-get repo and cache
+        become:        yes
+        become_user:   root
+        become_method: sudo
+        apt:
+          update_cache:     yes
+          force_apt_get:    yes
+          cache_valid_time: 3600

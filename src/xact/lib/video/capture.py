@@ -8,7 +8,7 @@ Video capture node.
 import cv2
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the video capture node.

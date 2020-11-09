@@ -11,7 +11,7 @@ import importlib
 import torch
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the neural network model adaptation node.

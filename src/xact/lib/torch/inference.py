@@ -8,7 +8,7 @@ Pytorch inference node.
 import torch
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the pytorch inference node.

@@ -5,7 +5,7 @@ Xact component for test output validation.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the signal validator.

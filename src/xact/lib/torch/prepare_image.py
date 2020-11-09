@@ -10,7 +10,7 @@ import numpy
 import torch
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the video capture node.

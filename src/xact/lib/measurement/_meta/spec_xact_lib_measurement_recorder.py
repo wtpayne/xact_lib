@@ -26,7 +26,7 @@ class SpecifyRecorder:
         """
         with tempfile.TemporaryDirectory() as dirpath_tmp:
 
-            cfg = xact.lib.test.component.chain_test(
+            cfg = xact.lib.test.component.pipeline_test(
                     list_pipeline_modules = [
                             'xact.lib.measurement.recorder'],
                     list_pipeline_node_config = [
@@ -52,7 +52,7 @@ class SpecifyRecorder:
             filepath_rec = list_filepath_rec[0]
             dirpath_rec  = os.path.dirname(filepath_rec)
 
-            cfg = xact.lib.test.component.chain_test(
+            cfg = xact.lib.test.component.pipeline_test(
                     list_pipeline_modules = [
                             'xact.lib.measurement.player'],
                     list_pipeline_node_config = [
@@ -60,10 +60,10 @@ class SpecifyRecorder:
                     list_pipeline_edge_info = [],
                     list_test_vectors = [
                             {'path':   ['data',  'values'],
-                             'signal': [{'foo': 0},
-                                        {'foo': 0},
-                                        {'foo': 0},
-                                        {'foo': 0}]}],
+                             'signal': [None,
+                                        None,
+                                        None,
+                                        None]}],
                     list_expected_outputs = [
                             {'path':   ['data', 'values'],
                              'signal': [{'foo': 10, 'bar': 100},

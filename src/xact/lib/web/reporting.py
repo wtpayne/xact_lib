@@ -5,7 +5,7 @@ Simple reporting component.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the reporting component.

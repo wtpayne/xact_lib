@@ -29,7 +29,7 @@ import starlette.websockets
 import uvicorn
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Start the ASGI server and connect it to the xact network.``
@@ -61,7 +61,7 @@ def reset(runtime, cfg, inputs, state, outputs):
     state['process_server'].start()
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def step(inputs, state, outputs):
     """
     Update the ASGI server and pass on any new interactions and analytics.
@@ -75,13 +75,13 @@ def step(inputs, state, outputs):
         ts     = None
 
     # Updated resources from xact-backend to ASGI-server.
-    for (key, val) in inputs.items():
-        if key.startswith('resources'):
-            if inputs[key]['ena']:
-                try:
-                    state['queue_resources'].put(inputs[key], block = False)
-                except queue.Full:
-                    pass # TODO: LOG SOME SORT OF ERROR?
+    if inputs['resources']['ena']:
+        for map_res in inputs['resources']['list']:
+            try:
+                state['queue_resources'].put(map_res,
+                                             block = False)
+            except queue.Full:
+                pass # TODO: LOG SOME SORT OF ERROR?
 
     # User interactions from ASGI-server to xact-backend.
     if 'interactions' in outputs:
@@ -114,7 +114,7 @@ def step(inputs, state, outputs):
             break
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def _asgi_server_process(cfg, map_queues):
     """
     Run the ASGI server process. (Runs until killed by a signal)
@@ -122,7 +122,7 @@ def _asgi_server_process(cfg, map_queues):
     """
 
     #--------------------------------------------------------------------------
-    async def get_resource(request = None):
+    async def get_resource(request = None, *args, **kwargs):
         """
         Return a response for the specified id_resource param.
 
@@ -195,8 +195,8 @@ def _asgi_server_process(cfg, map_queues):
         Update resource table and notify listeners of changes.
 
         """
-        set_id_resource_changed  = _update_resource_table()
-        _notify_change_listeners(set_id_resource_changed)
+        set_id_resource_to_notify = _update_resource_table()
+        _notify_change_listeners(set_id_resource_to_notify)
 
     #--------------------------------------------------------------------------
     def _update_resource_table():
@@ -204,27 +204,33 @@ def _asgi_server_process(cfg, map_queues):
         Bring the resource table up to date with the latest changes from XACT.
 
         """
-        set_id_resource_changed = set()
+        set_id_resource_to_notify = set()
         while True:
+
+            # Update the resource database.
             try:
                 resource_update = app.state.queue_resources.get(block = False)
                 app.state.map_resources.update(resource_update)
             except queue.Empty:
                 break
-            set_id_resource_changed |= set(resource_update.keys())
 
-        if 'default' in set_id_resource_changed:
-            app.state.default = resource_update['default']
+            # Keep track of which change listeners to notify.
+            set_id_resource_updated = set(resource_update.keys())
+            set_id_resource_to_notify |= set_id_resource_updated
 
-        return set_id_resource_changed
+            # Update default
+            if 'default' in set_id_resource_updated:
+                app.state.default = resource_update['default']
+
+        return set_id_resource_to_notify
 
     #--------------------------------------------------------------------------
-    def _notify_change_listeners(set_id_resource_changed):
+    def _notify_change_listeners(set_id_resource_to_notify):
         """
         Distribute change notifications to all SSE event source queues.
 
         """
-        for id_resource in set_id_resource_changed:
+        for id_resource in set_id_resource_to_notify:
             list_queue_notify = app.state.map_queue_notify[id_resource]
             for queue_notify in list_queue_notify:
                 queue_notify.put_nowait({
@@ -357,7 +363,8 @@ def _asgi_server_process(cfg, map_queues):
                          route('/wss/{id_resource}', handle_websocket),
                          route('/{id_resource}',     get_resource),
                          route('/',                  get_resource)]
-    exceptions        = { 404: get_resource,
+    exceptions        = { 204: get_resource,
+                          404: get_resource,
                           500: get_resource }
 
     app = starlette.applications.Starlette(debug              = True,
@@ -372,8 +379,8 @@ def _asgi_server_process(cfg, map_queues):
     app.state.ts_last_update = 0.0
     app.state.default        = None
 
-    uvicorn.run(app, host = cfg['host'],
-                     port = cfg['port'],
-                     debug = True)
+    uvicorn.run(app, host  = cfg['host'],
+                     port  = cfg['port'],
+                     debug = cfg['debug'])
 
 

@@ -5,7 +5,7 @@ Xact component for test vector generation.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the signal generator.
@@ -29,7 +29,14 @@ def step(inputs, state, outputs):
         path   = channel['path']
         cursor = outputs
         for name in path[:-1]:
-            if name not in cursor:
+            if name in cursor and isinstance(cursor[name], dict):
+                pass
+                # cursor[name].clear()
+            else:
                 cursor[name] = dict()
             cursor = cursor[name]
-        cursor[path[-1]] = sample_value
+
+        if len(path) == 1:
+            cursor[path[-1]].update(sample_value)
+        else:
+            cursor[path[-1]] = sample_value

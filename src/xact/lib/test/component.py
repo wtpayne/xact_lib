@@ -5,6 +5,8 @@ Component test utilities for xact systems.
 """
 
 
+import pprint
+
 import click.testing
 import pytest
 
@@ -14,18 +16,21 @@ import xact.cli.command
 import xact.util.serialization
 
 
-#------------------------------------------------------------------------------
-def chain_test(list_pipeline_modules,
-               list_pipeline_node_config,
-               list_test_vectors,
-               list_expected_outputs,
-               list_pipeline_edge_info = [],
-               list_id_node_nocontrol  = []):
+# -----------------------------------------------------------------------------
+def pipeline_test(list_pipeline_modules,
+                  list_pipeline_node_config,
+                  list_test_vectors,
+                  list_expected_outputs,
+                  list_pipeline_edge_info = [],
+                  list_id_node_nocontrol  = []):
     """
-    Return configuration for a transcoder pipeline round trip test.
+    Return configuration for a pipeline test.
 
     """
-    num_pipeline_nodes = len(list_pipeline_modules)
+    num_pipeline_nodes  = len(list_pipeline_modules)
+    num_pipeline_config = len(list_pipeline_node_config)
+    assert num_pipeline_nodes == num_pipeline_config
+
     list_id_node       = ['signal_generator']
     for idx in range(num_pipeline_nodes):
         node_name = 'pipeline_node_{idx:03d}'.format(idx = idx)
@@ -82,10 +87,20 @@ def chain_test(list_pipeline_modules,
             subordinate_nodes = list_id_node_controlled,
             max_idx           = _num_samples(list_test_vectors,
                                              key = 'signal'))
+
+    try:
+        xact.cfg.validate.normalized(cfg)  # Sanity check
+    except xact.cfg.exception.CfgError as err:
+
+        msg = pprint.pformat(cfg) + '\n\n' + str(err)
+
+        pytest.fail(msg = msg, pytrace = False)
+
+
     return cfg
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def _num_samples(test_vectors, key):
   """
   Return the number of samples in the specified test vector.
@@ -97,7 +112,7 @@ def _num_samples(test_vectors, key):
   return num_samples
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def _is_all_equal(itable):
     """
     Return true if all items in the supplied iterable are equal.
@@ -108,7 +123,7 @@ def _is_all_equal(itable):
     return all(item == item_first for item in iter_items)
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def _get_skeleton_component_test():
     """
     Return configuration data for a skeleton local system.
@@ -138,13 +153,12 @@ def _get_skeleton_component_test():
     return cfg
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def _add_controller(cfg, subordinate_nodes, max_idx):
     """
     Add a controller.
 
     """
-     # = ('signal_generator', 'output_evaluator')
     xact.cfg.builder.add_node(
                         cfg          = cfg,
                         id_node      = 'controller',

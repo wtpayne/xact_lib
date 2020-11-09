@@ -5,7 +5,7 @@ Duplicate a single input data item onto all outputs.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the tee.

@@ -5,7 +5,6 @@ Functional specification for xact tee.
 """
 
 
-import xact.cfg.builder
 import xact.lib.test.component
 
 
@@ -21,7 +20,7 @@ class SpecifyPacker:
         Test that the packer component packs data.
 
         """
-        cfg = xact.lib.test.component.chain_test(
+        cfg = xact.lib.test.component.pipeline_test(
                 list_pipeline_modules = [
                         'xact.lib.util.packer'],
                 list_pipeline_node_config = [
@@ -43,7 +42,7 @@ class SpecifyPacker:
         Round trip test for the packer component.
 
         """
-        cfg = xact.lib.test.component.chain_test(
+        cfg = xact.lib.test.component.pipeline_test(
                 list_pipeline_modules = [
                         'xact.lib.util.packer',
                         'xact.lib.util.unpacker'],

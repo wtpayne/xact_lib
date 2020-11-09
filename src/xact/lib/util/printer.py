@@ -10,7 +10,7 @@ import pprint
 import sys
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the pretty printer.
@@ -41,7 +41,16 @@ def reset(runtime, cfg, inputs, state, outputs):
 
     state['path'] = list(list())
     if 'path' in cfg:
-        state['path'] = cfg['path']
+        for path in cfg['path']:
+            state['path'].append(path.split('.'))
+    else:
+        for key in inputs.keys():
+            state['path'].append([key])
+
+    if 'only_enabled' in cfg:
+        state['only_enabled'] = cfg['only_enabled']
+    else:
+        state['only_enabled'] = False
 
 
 
@@ -52,6 +61,11 @@ def step(inputs, state, outputs):
 
     """
     for path in state['path']:
+
+        root = inputs[path[0]]
+        if state['only_enabled'] and 'ena' in root:
+            if root['ena'] is False:
+                continue
 
         cursor = inputs
         for name in path:

@@ -5,7 +5,7 @@ Xact component for physical entity simulation.
 """
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Reset the physical entity simulation component.
