@@ -29,7 +29,7 @@ def step(inputs, state, outputs):
     Step the continuous integration distributor component.
 
     """
-    list_name_output = ('python',)
+    list_name_output = ('all', 'python', 'xact')
     for name in list_name_output:
         outputs[name].clear()
         outputs[name]['ena']  = False
@@ -39,8 +39,15 @@ def step(inputs, state, outputs):
         return
 
     for content in inputs['content']['list']:
-        if _is_python_file(content['filepath']):
+        filepath = content['filepath']
+
+        outputs['all']['list'].append(content)
+
+        if _is_python_file(filepath):
             outputs['python']['list'].append(content)
+
+        elif _is_xact_cfg_file(filepath):
+            outputs['xact']['list'].append(content)
 
     for name in list_name_output:
         if outputs[name]['list']:
@@ -146,6 +153,15 @@ def _is_source_file(filepath):
 
     """
     return _is_python_file(filepath) or _is_cpp_file(filepath)
+
+
+# -----------------------------------------------------------------------------
+def _is_xact_cfg_file(filepath):
+    """
+    Return True if filepath is an xact config file.
+
+    """
+    return filepath.endswith('.cfg.yaml')
 
 
 # -----------------------------------------------------------------------------

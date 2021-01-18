@@ -1,5 +1,5 @@
 system:
-  id_system: demo_watchdog
+  id_system: xact_ci
 
 
 ###############################################################################
@@ -46,7 +46,7 @@ node:
       py_module:    xact.lib.util.simple_controller
     state_type:     py_dict
     config:
-      frequency_hz: 10
+      frequency_hz: 3
 
   # ---------------------------------------------------------------------------
   controller_tee:
@@ -76,7 +76,7 @@ node:
     state_type:     py_dict
     config:
       dirpath_root: /media/wtp/Data/dev/xact_lib/
-      size_batch:   10
+      size_batch:   1
       direxcl:
         - !regex '^\..*$'
         - !regex '^.*\.egg-info$'
@@ -100,7 +100,7 @@ node:
       py_module:    xact.lib.ci.sequencer
     state_type:     py_dict
     config:
-      size_batch:   10
+      size_batch:   1
 
   # ---------------------------------------------------------------------------
   loader:
@@ -254,19 +254,37 @@ node:
     state_type:     py_dict
 
   # ---------------------------------------------------------------------------
-  nonconformity_reporter:
+  doc_nonconformity:
     process:        report_process
     req_host_cfg:   default_configuration
     functionality:
-      py_module:    xact.lib.ci.reporter
+      py_module:    xact.lib.ci.doc_nonconformity
     state_type:     py_dict
 
   # ---------------------------------------------------------------------------
-  pydesigndoc:
+  doc_all:
     process:        report_process
     req_host_cfg:   default_configuration
     functionality:
-      py_module:    xact.lib.ci.pydesigndoc
+      py_module:    xact.lib.util.livereload
+    state_type:     py_dict
+    config:
+      py_module:    xact.lib.ci.doc_all
+
+  # ---------------------------------------------------------------------------
+  doc_py:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.doc_py
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  doc_xact:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ci.doc_xact
     state_type:     py_dict
 
   # ---------------------------------------------------------------------------
@@ -276,6 +294,16 @@ node:
     functionality:
       py_module:    xact.lib.ci.collapsible_doc
     state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  entity:
+    process:        report_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.livereload
+    state_type:     py_dict
+    config:
+      py_module:    xact.lib.ci.entity
 
   # ---------------------------------------------------------------------------
   resource_merge:
@@ -321,6 +349,11 @@ edge:
   src:   controller_tee.outputs.clock_02
   dst:   sequencer.inputs.clock
 
+- owner: controller_tee
+  data:  py_dict
+  src:   controller_tee.outputs.clock_03
+  dst:   entity.inputs.clock
+
 - owner: watchdog
   data:  py_dict
   src:   watchdog.outputs.filepath
@@ -341,12 +374,24 @@ edge:
   src:   loader.outputs.content
   dst:   distributor.inputs.content
 
+# Index processing pipeline
+- owner: distributor
+  data:  py_dict
+  src:   distributor.outputs.all
+  dst:   doc_all.inputs.content
+
+# Xact processing pipeline
+- owner: distributor
+  data:  py_dict
+  src:   distributor.outputs.xact
+  dst:   doc_xact.inputs.content
+
+# Python processing pipeline - lead in and fan out
 - owner: distributor
   data:  py_dict
   src:   distributor.outputs.python
   dst:   pyparse.inputs.content
 
-# Python processing pipeline - fan out
 - owner: pyparse
   data:  py_dict
   src:   pyparse.outputs.content
@@ -385,9 +430,9 @@ edge:
 - owner: python_processing_tee
   data:  py_dict
   src:   python_processing_tee.outputs.content_06
-  dst:   pydesigndoc.inputs.content
+  dst:   doc_py.inputs.content
 
-# Nonconformity report merging
+# Python processing pipeline - Nonconformity report merging
 - owner: loader
   data:  py_dict
   src:   loader.outputs.nonconformity
@@ -431,9 +476,9 @@ edge:
 - owner: nonconformity_merge
   data:  py_dict
   src:   nonconformity_merge.outputs.nonconformity
-  dst:   nonconformity_reporter.inputs.nonconformity
+  dst:   doc_nonconformity.inputs.nonconformity
 
-# Conforming document report merging
+# Python processing pipeline - Conforming document report merging
 - owner: loader
   data:  py_dict
   src:   loader.outputs.conformity
@@ -477,12 +522,12 @@ edge:
 - owner: conformity_merge
   data:  py_dict
   src:   conformity_merge.outputs.conformity
-  dst:   nonconformity_reporter.inputs.conformity
+  dst:   doc_nonconformity.inputs.conformity
 
 # Nonconformity reporting
-- owner: nonconformity_reporter
+- owner: doc_nonconformity
   data:  py_dict
-  src:   nonconformity_reporter.outputs.documents
+  src:   doc_nonconformity.outputs.documents
   dst:   collapsible_doc.inputs.documents
 
 - owner: collapsible_doc
@@ -490,10 +535,20 @@ edge:
   src:   collapsible_doc.outputs.resources
   dst:   resource_merge.inputs.resources_00
 
-- owner: pydesigndoc
+- owner: doc_py
   data:  py_dict
-  src:   pydesigndoc.outputs.resources
+  src:   doc_py.outputs.resources
   dst:   resource_merge.inputs.resources_01
+
+- owner: doc_all
+  data:  py_dict
+  src:   doc_all.outputs.resources
+  dst:   resource_merge.inputs.resources_02
+
+- owner: entity
+  data:  py_dict
+  src:   entity.outputs.resources
+  dst:   resource_merge.inputs.resources_03
 
 - owner: resource_merge
   data:  py_dict

@@ -14,6 +14,8 @@ import time
 import watchdog.observers
 import watchdog.events
 
+import xact.lib.fs.search
+
 
 # -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
@@ -21,12 +23,11 @@ def reset(runtime, cfg, inputs, state, outputs):
     Reset the filesystem watchdog component.
 
     """
-    state['handler']  = EventEnqueueingHandler()
-    state['observer'] = watchdog.observers.Observer()
-    state['observer'].schedule(event_handler = state['handler'],
-                               path          = cfg['dirpath_root'],
-                               recursive     = cfg.get('recursive', True))
-    state['observer'].start()
+    state['generator'] = _filtered_filepath_generator(
+                                      path      = cfg['dirpath_root'],
+                                      recursive = cfg.get('recursive', True),
+                                      pathincl  = cfg.get('pathincl',  None),
+                                      pathexcl  = cfg.get('pathexcl',  None))
 
 
 # -----------------------------------------------------------------------------
@@ -37,18 +38,52 @@ def step(inputs, state, outputs):
     """
     outputs['filepath'].clear()
     outputs['filepath']['ena']  = False
-    outputs['filepath']['list'] = []
+    outputs['filepath']['list'] = next(state['generator'])
+    if outputs['filepath']['list']:
+        outputs['filepath']['ena'] = True
 
-    for event in state['handler'].get():
+# -----------------------------------------------------------------------------
+def _filtered_filepath_generator(path, recursive, pathincl, pathexcl):
+    """
+    Yield filepaths of matching modified files.
+
+    """
+    observer  = watchdog.observers.Observer()
+    handler   = EventEnqueueingHandler()
+    indicator = xact.lib.fs.search.get_dual_regex_indicator_fcn(
+                                                            incl = pathincl,
+                                                            excl = pathexcl)
+
+    observer.schedule(event_handler = handler,
+                      path          = path,
+                      recursive     = recursive)
+    observer.start()
+
+    while True:
+        yield sorted(
+            (path for path in _filepath_generator(handler) if indicator(path)))
+
+
+# -----------------------------------------------------------------------------
+def _filepath_generator(handler):
+    """
+    Yield filepaths from the specified handler.
+
+    """
+    for event in handler.get():
+
         if event.is_dir:
             continue
-        elif event.path_dst is not None:
-            outputs['filepath']['list'].append(event.path_dst)
-        elif event.path_src is not None:
-            outputs['filepath']['list'].append(event.path_src)
 
-    if outputs['filepath']['list']:
-        outputs['filepath']['ena']  = True
+        if event.path_dst is not None:
+            filepath = event.path_dst
+            yield filepath
+            continue
+
+        if event.path_src is not None:
+            filepath = event.path_src
+            yield filepath
+            continue
 
 
 # =============================================================================

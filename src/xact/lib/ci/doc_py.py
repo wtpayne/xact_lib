@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Python design documentation generator.
+Documentation generator for python design documents.
 
 """
 
@@ -45,6 +45,7 @@ def step(inputs, state, outputs):
     for map_content in inputs['content']['list']:
         filepath = map_content['filepath']
         key      = filepath.replace(os.sep, '.')
+        key      = 'source' + key
         html     = _render_document(map_content)
         if html is not None:
             map_res.htm(**{key: html})

@@ -10,11 +10,15 @@ Based on starlette and uvicorn.
 import asyncio
 import collections
 import copy
+import datetime
+import hashlib
 import multiprocessing
 import queue
 import time
 import uuid
 
+from ariadne import QueryType, make_executable_schema
+from ariadne.asgi import GraphQL
 import dill
 import loguru
 import sse_starlette.sse
@@ -29,26 +33,37 @@ import starlette.websockets
 import uvicorn
 
 
+_DEFAULT_DOC = ('text/html',
+"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>No content</title>
+  </head>
+  <body>
+    No content.
+  </body>
+</html>
+""")
+
+_ID_COOKIE_SESSION = 'xw_sid'
+_ID_COOKIE_USER    = 'xw_uid'
+
+
 # -----------------------------------------------------------------------------
 def reset(runtime, cfg, inputs, state, outputs):
     """
     Start the ASGI server and connect it to the xact network.``
 
     """
-    if 'interactions' in outputs:
-        outputs['interactions'].clear()
-        outputs['interactions']['ena']  = False
-        outputs['interactions']['list'] = list()
-
-    if 'analytics' in outputs:
-        outputs['analytics'].clear()
-        outputs['analytics']['ena']  = False
-        outputs['analytics']['list'] = list()
+    if 'requests' in outputs:
+        outputs['requests'].clear()
+        outputs['requests']['ena']  = False
+        outputs['requests']['list'] = list()
 
     map_queues = dict(
-        queue_resources    = multiprocessing.Queue(),  # From xact to client
-        queue_interactions = multiprocessing.Queue(),  # From client to xact
-        queue_analytics    = multiprocessing.Queue()   # From client to xact
+        queue_resources = multiprocessing.Queue(), # From xact to client
+        queue_requests  = multiprocessing.Queue(), # From client to xact
     )
     for (key, value) in map_queues.items():
         state[key] = value
@@ -59,12 +74,13 @@ def reset(runtime, cfg, inputs, state, outputs):
                                                 name   = 'xact-asgi-server',
                                                 daemon = True)
     state['process_server'].start()
+    state['map_hashes'] = dict()
 
 
 # -----------------------------------------------------------------------------
 def step(inputs, state, outputs):
     """
-    Update the ASGI server and pass on any new interactions and analytics.
+    Update the ASGI server and pass on any new requests from the client.
 
     """
     if 'time' in inputs and inputs['time']['ena']:
@@ -76,42 +92,50 @@ def step(inputs, state, outputs):
 
     # Updated resources from xact-backend to ASGI-server.
     if inputs['resources']['ena']:
+        accumulator = dict()
         for map_res in inputs['resources']['list']:
-            try:
-                state['queue_resources'].put(map_res,
-                                             block = False)
-            except queue.Full:
-                pass # TODO: LOG SOME SORT OF ERROR?
+            _remove_duplicates(map_res, state['map_hashes'])
+            accumulator.update(map_res)
+        try:
+            state['queue_resources'].put(accumulator, block = False)
+        except queue.Full:
+            pass # TODO: LOG SOME SORT OF ERROR?
 
-    # User interactions from ASGI-server to xact-backend.
-    if 'interactions' in outputs:
-        outputs['interactions']['ena'] = False
-        outputs['interactions']['list'].clear()
+    # Client data from ASGI-server to xact-backend.
+    if 'requests' in outputs:
+        outputs['requests']['ena'] = False
+        outputs['requests']['list'].clear()
     while True:
         try:
-            interaction = state['queue_interactions'].get(block = False)
-            if 'interactions' in outputs:
-                outputs['interactions']['ena']    = True
-                outputs['interactions']['ts']     = ts
-                outputs['interactions']['gmtime'] = gmtime
-                outputs['interactions']['list'].append(interaction)
+            map_requests = state['queue_requests'].get(block = False)
+            if 'requests' in outputs:
+                outputs['requests']['ena']    = True
+                outputs['requests']['ts']     = ts
+                outputs['requests']['gmtime'] = gmtime
+                outputs['requests']['list'].append(map_requests)
         except queue.Empty:
             break
 
-    # Analytics from ASGI-server to xact-backend.
-    if 'analytics' in outputs:
-        outputs['analytics']['ena'] = False
-        outputs['analytics']['list'].clear()
-    while True:
-        try:
-            analytics_item = state['queue_analytics'].get(block = False)
-            if 'analytics' in outputs:
-                outputs['analytics']['ena']    = True
-                outputs['analytics']['ts']     = ts
-                outputs['analytics']['gmtime'] = gmtime
-                outputs['analytics']['list'].append(analytics_item)
-        except queue.Empty:
-            break
+
+# -----------------------------------------------------------------------------
+def _remove_duplicates(map_res, map_hashes):
+    """
+    Modify map_res to remove duplicates that we have seen before.
+
+    """
+    tup_route = tuple(map_res.keys())
+    for route in tup_route:
+
+        (media_type, obj) = map_res[route]
+        hash = hashlib.md5()
+        hash.update(media_type.encode('utf-8'))
+        hash.update(obj.encode('utf-8'))
+        digest = hash.hexdigest()
+
+        if route in map_hashes and digest == map_hashes[route]:
+            map_res.pop(route, None)
+        else:
+            map_hashes[route] = digest
 
 
 # -----------------------------------------------------------------------------
@@ -122,120 +146,230 @@ def _asgi_server_process(cfg, map_queues):
     """
 
     #--------------------------------------------------------------------------
-    async def get_resource(request = None, *args, **kwargs):
+    async def handle_route(request = None, *args, **kwargs):
         """
         Return a response for the specified id_resource param.
 
         """
-        _update_and_notify()
-        tasks = starlette.background.BackgroundTasks()
-        tasks.add_task(_update_and_notify_task)
+        tasks = _ensure_continuously_updated()
+
+        (id_session, id_user) = _get_cookies(request)
 
         if request is None:
             id_resource = 'default'
-            # print('NEW UID AND SID')
-            # id_user     = uuid.uuid4()
-            # id_session  = uuid.uuid4()
         else:
-            id_resource = request.path_params.get(
-                                    'id_resource', request.url.path.strip('/'))
-            map_cookie  = getattr(request, 'cookies', dict())
-            id_user     = map_cookie.get('xw_uid', uuid.uuid4())
-            id_session  = map_cookie.get('xw_sid', uuid.uuid4())
-            # print('OLD? UID AND SID')
-            # print(id_user)
-            # print(id_session)
-            # print(map_cookie)
-            # print(request.cookies)
+            url_path    = request.url.path.strip('/')
+            id_resource = request.path_params.get('id_resource', url_path)
+            tasks.add_task(_enqueue_requests,
+                           request     = request,
+                           id_resource = id_resource,
+                           id_session  = id_session,
+                           id_user     = id_user)
 
         (media_type, content) = _lookup_resource(id_resource)
-        if media_type == 'callable':
-            (media_type, content) = dill.loads(content)(request)
 
-        if request is not None:
-            _enqueue_interactions(request.query_params)
-            _enqueue_analytics(request, id_user, id_session)
+        # SSE connection to a pub-sub topic.
+        if media_type == 'topic':
+            response = _get_sse_event_source_for_topic(
+                                        tasks, request, id_topic = id_resource)
+            return response
+
+        # Websocket connection to a callback "resource".
+        if media_type == 'socket':
+            await _websocket_handler(
+                            websocket = request,
+                            callback  = _load_callback(media_type, content))
+            return None
+
+        # HTTP request to a callback "resource".
+        if media_type in ('callback',):
+            callback = _load_callback(media_type, content)
+            (media_type, content) = callback(request)
 
         response = starlette.responses.Response(media_type = media_type,
                                                 content    = content,
                                                 background = tasks)
-        response.set_cookie('xw_uid', id_user,
-                            max_age  = 32000000, # About a year.
-                            secure   = False,    # TODO: FIX HTTPS
-                            httponly = True,
-                            samesite = 'strict')
-        response.set_cookie('xw_sid', id_session,
-                            max_age  = 43000,   # About 12 hours
-                            secure   = False,   # TODO: FIX HTTPS
-                            httponly = True,
-                            samesite = 'strict')
+        _set_cookies(response, id_session, id_user)
         return response
 
 
-
     #--------------------------------------------------------------------------
-    async def _update_and_notify_task():
+    def _ensure_continuously_updated():
         """
-        Continually update resource table and notify listeners of changes.
+        Update app state and ensure that background update tasks are running.
 
         """
-        staleout = 2.0  # seconds
-        is_stale = time.time() > (app.state.ts_last_update + staleout)
-        if not is_stale:
-            return
-
-        while True:
-            await asyncio.sleep(0.1)
-            app.state.ts_last_update = time.time()
-            _update_and_notify()
+        _update_and_notify()
+        tasks = starlette.background.BackgroundTasks()
+        tasks.add_task(_update_and_notify_background_task)
+        return tasks
 
     #--------------------------------------------------------------------------
     def _update_and_notify():
         """
-        Update resource table and notify listeners of changes.
+        Update resources and topics then notify listeners of changes.
 
         """
-        set_id_resource_to_notify = _update_resource_table()
-        _notify_change_listeners(set_id_resource_to_notify)
+        (set_id_resource_changed, set_id_topic_changed) = _update_resources()
+        _update_topics(set_id_topic_changed)
+        _notify_listeners(set_id_resource_changed)
 
     #--------------------------------------------------------------------------
-    def _update_resource_table():
+    def _update_resources():
         """
-        Bring the resource table up to date with the latest changes from XACT.
+        Bring the resource table up to date with the latest changes.
 
         """
-        set_id_resource_to_notify = set()
+        set_id_topic_changed    = set()
+        set_id_resource_changed = set()
         while True:
 
             # Update the resource database.
             try:
-                resource_update = app.state.queue_resources.get(block = False)
-                app.state.map_resources.update(resource_update)
+                map_resource_batch = app.state.queue_resources.get(
+                                                                block = False)
+                app.state.map_resources.update(map_resource_batch)
             except queue.Empty:
                 break
 
             # Keep track of which change listeners to notify.
-            set_id_resource_updated = set(resource_update.keys())
-            set_id_resource_to_notify |= set_id_resource_updated
+            set_id_resource_in_batch = set(map_resource_batch.keys())
+            set_id_resource_changed |= set_id_resource_in_batch
 
-            # Update default
-            if 'default' in set_id_resource_updated:
-                app.state.default = resource_update['default']
+            # Update default and keep track of which topics have changed.
+            for (id_resource, resource) in map_resource_batch.items():
+                if id_resource == 'default':
+                    app.state.default = map_resource_batch['default']
+                (type_resource, bytes_resource) = resource
+                if type_resource == 'topic':
+                    id_topic = id_resource
+                    set_id_topic_changed.add(id_topic)
 
-        return set_id_resource_to_notify
+        return (set_id_resource_changed, set_id_topic_changed)
 
     #--------------------------------------------------------------------------
-    def _notify_change_listeners(set_id_resource_to_notify):
+    def _update_topics(set_id_topic_changed):
         """
-        Distribute change notifications to all SSE event source queues.
+        Bring the topic lookups up to date with the latest changes.
+
+        First, we determine if any active
+        topics have changed. Recall that
+        each id_topic is also an id_resource,
+        so all we need to do is to find if
+        any active topic ids are in the set
+        of changed resource ids.
+
+        Once we have the list of topics
+        that have changed, we can work
+        out which resources have been
+        added to each topic, and which
+        resources have been removed, and
+        update the maps as required.
 
         """
-        for id_resource in set_id_resource_to_notify:
-            list_queue_notify = app.state.map_queue_notify[id_resource]
-            for queue_notify in list_queue_notify:
-                queue_notify.put_nowait({
-                    'event': id_resource,
-                    'data': 'updated'})
+        for id_topic in set_id_topic_changed:
+            set_id_resource_old = app.state.map_topic_to_resource[id_topic]
+            bytes_topic         = app.state.map_resources[id_topic][1]
+            set_id_resource_new = set(bytes_topic.split(' '))
+            for id_resource in set_id_resource_old - set_id_resource_new:
+                app.state.map_resource_to_topic[id_resource].remove(id_topic)
+            for id_resource in set_id_resource_new - set_id_resource_old:
+                app.state.map_resource_to_topic[id_resource].add(id_topic)
+            app.state.map_topic_to_resource[id_topic] = set_id_resource_new
+
+    #--------------------------------------------------------------------------
+    def _notify_listeners(set_id_resource_changed):
+        """
+        Notify listeners of changes to resources.
+
+        Listeners subscribe to topics, each
+        of which is a collection of resources.
+
+        Firstly, we determine the set of
+        responsive topics, given the set
+        of resources that have changed.
+
+        Them, we publish notifications to
+        the relevant subscribed queues.
+
+        """
+        for id_resource in set_id_resource_changed:
+            # print(datetime.datetime.now().isoformat() + ' - ' + id_resource)
+            for id_topic in app.state.map_resource_to_topic[id_resource]:
+                for queue_subscriber in app.state.map_topic_to_queue[id_topic]:
+                    queue_subscriber.put_nowait({
+                        'event': id_resource,
+                        'data':  app.state.map_resources[id_resource][1]})
+
+
+    #--------------------------------------------------------------------------
+    async def _update_and_notify_background_task():
+        """
+        Continually update resource table and notify listeners of changes.
+
+        Try to detect if another background task
+        is already running by looking at when
+        the state was last updated.
+
+        """
+        polling_interval   = 0.1 # seconds
+        staleout_duration  = 3 * polling_interval
+        staleout_time      = app.state.ts_last_update + staleout_duration
+        is_stale           = time.time() > staleout_time
+        is_another_running = not is_stale
+
+        if is_another_running:
+            return
+
+        ts_last_update = app.state.ts_last_update
+        while True:
+            await asyncio.sleep(polling_interval)
+
+            # If another background process is
+            # running and updating the state,
+            # then we don't need to be running
+            # ourselves.
+            #
+            is_another_running = ts_last_update != app.state.ts_last_update
+            if is_another_running:
+                return
+
+            ts_last_update = time.time()
+            app.state.ts_last_update = ts_last_update
+            _update_and_notify()
+
+    #--------------------------------------------------------------------------
+    async def _enqueue_requests(request, id_resource, id_session, id_user):
+        """
+        Enqueue requests from the client for the rest of the xact system.
+
+        """
+        headers      = dict(request.headers)
+        request_data = dict(id_resource     = str(id_resource),
+                           id_session      = str(id_session),
+                           id_user         = str(id_user),
+                           client_ip       = request['client'][0],
+                           url             = str(request.url),
+                           accept          = headers['accept'],
+                           accept_encoding = headers['accept-encoding'],
+                           accept_language = headers['accept-language'],
+                           user_agent      = headers['user-agent'])
+
+        if request.method == 'POST':
+            postdata = await request.body()
+        else:
+            postdata = None
+        if postdata:
+            request_data['postdata'] = postdata
+
+        query_params = request.query_params
+        for key in query_params.keys():
+            request_data[key] = query_params.getlist(key)
+
+        try:
+            app.state.queue_requests.put(request_data, block = False)
+        except queue.Full:
+            pass
 
     #--------------------------------------------------------------------------
     def _lookup_resource(id_resource):
@@ -249,6 +383,10 @@ def _asgi_server_process(cfg, map_queues):
             else:
                 raise starlette.exceptions.HTTPException(
                                             status_code = 204)  # No content
+
+        if id_resource == 'keys':
+            return ('text/html', '<br>'.join(app.state.map_resources.keys()))
+
         try:
             return app.state.map_resources[id_resource]
         except KeyError:
@@ -259,53 +397,18 @@ def _asgi_server_process(cfg, map_queues):
                                             status_code = 204)  # No content
 
     #--------------------------------------------------------------------------
-    def _enqueue_interactions(query_params):
+    def _get_sse_event_source_for_topic(tasks, request, id_topic):
         """
-        Enqueue urlencoded user interactions for xact.
-
-        """
-        dict_params = dict()
-        for key in query_params.keys():
-            dict_params[key] = query_params.getlist(key)
-
-        if dict_params:
-            try:
-                app.state.queue_interactions.put(dict_params, block = False)
-            except queue.Full:
-                pass # TODO: LOGGING
-
-    #--------------------------------------------------------------------------
-    def _enqueue_analytics(request, id_user, id_session):
-        """
-        Enqueue analytics data.
+        Return an SSE EventSourceaResponse for the specified pub sub topic.
 
         """
-        headers   = dict(request.headers)
-        analytics = dict(id_user         = str(id_user),
-                         id_session      = str(id_session),
-                         client_ip       = request['client'][0],
-                         url             = str(request.url),
-                         accept          = headers['accept'],
-                         accept_encoding = headers['accept-encoding'],
-                         accept_language = headers['accept-language'],
-                         user_agent      = headers['user-agent'])
-
-        try:
-            app.state.queue_analytics.put(analytics, block = False)
-        except queue.Full:
-            pass # TODO: LOGGING
-
-    #--------------------------------------------------------------------------
-    async def subscribe_sse_notify(request):
-        """
-        Return sse event source for notifications of changes to id_resource.
-
-        """
-        id_resource  = request.path_params['id_resource']
         queue_notify = asyncio.Queue()
-        app.state.map_queue_notify[id_resource].append(queue_notify)
-        return sse_starlette.sse.EventSourceResponse(
-                        _generate_change_notifications(request, queue_notify))
+        app.state.map_topic_to_queue[id_topic].add(queue_notify)
+        response = sse_starlette.sse.EventSourceResponse(
+                            content    = _generate_change_notifications(
+                                                    request, queue_notify),
+                            background = tasks)
+        return response
 
     #--------------------------------------------------------------------------
     async def _generate_change_notifications(request, queue_notify):
@@ -318,7 +421,6 @@ def _asgi_server_process(cfg, map_queues):
         while True:
 
             if (await request.is_disconnected()):
-                # print('DISCONNECT')
                 break
 
             try:
@@ -329,55 +431,94 @@ def _asgi_server_process(cfg, map_queues):
             yield item
 
     #--------------------------------------------------------------------------
-    async def handle_websocket(websocket):
+    async def _websocket_handler(websocket, callback):
         """
-        Handle websocket communications with the specified id_resource param.
-
-        !!! WORK IN PROGRESS !!!
+        Handle websocket communications using the specified callback.
 
         """
-        print('WEBSOCKET!')
-
-        # id_resource = websocket.path_params['id_resource']
-        # (media_type, handler) = _lookup_resource(id_resource)
-
-        # if media_type != 'callable':
-        #     raise starlette.exceptions.HTTPException(status_code = 404)
-
         await websocket.accept()
-        print('WSS ACCEPTED')
-
-        # while True:
-        #     await websocket.send_text(handler(await websocket.receive_text()))
-
+        while True:
+            message = await websocket.receive_text()
+            reply   = callback(message)
+            await websocket.send_text(reply)
         await websocket.close()
-        print('WSS CLOSED')
 
-    Middleware        = starlette.middleware.Middleware
-    SessionMiddleware = starlette.middleware.sessions.SessionMiddleware
-    list_middleware   = [Middleware(SessionMiddleware,
-                                    secret_key = cfg['session_key'])]
-    route             = starlette.routing.Route
-    list_routes       = [route('/req/{id_resource}', get_resource),
-                         route('/sub/{id_resource}', subscribe_sse_notify),
-                         route('/wss/{id_resource}', handle_websocket),
-                         route('/{id_resource}',     get_resource),
-                         route('/',                  get_resource)]
-    exceptions        = { 204: get_resource,
-                          404: get_resource,
-                          500: get_resource }
+    #--------------------------------------------------------------------------
+    def _load_callback(media_type, content):
+        """
+        Load the specified callback function.
+
+        """
+        return dill.loads(content)
+
+    #--------------------------------------------------------------------------
+    def _get_cookies(request):
+        """
+        Get cookies from the specified request.
+
+        """
+        if request is None:
+            id_session = uuid.uuid4()
+            id_user    = uuid.uuid4()
+        else:
+            map_cookie = getattr(request, 'cookies', dict())
+            id_session = map_cookie.get(_ID_COOKIE_SESSION, uuid.uuid4())
+            id_user    = map_cookie.get(_ID_COOKIE_USER,    uuid.uuid4())
+        return (id_session, id_user)
+
+    #--------------------------------------------------------------------------
+    def _set_cookies(response, id_session, id_user):
+        """
+        Set cookies on the specified response.
+
+        """
+        response.set_cookie(_ID_COOKIE_SESSION, id_session,
+                            max_age  = 43000,    # About 12 hours
+                            secure   = False,    # TODO: FIX HTTPS
+                            httponly = True,
+                            samesite = 'strict')
+        response.set_cookie(_ID_COOKIE_USER, id_user,
+                            max_age  = 32000000, # About a year.
+                            secure   = False,    # TODO: FIX HTTPS
+                            httponly = True,
+                            samesite = 'strict')
+
+    WSock = starlette.routing.WebSocketRoute
+    Route = starlette.routing.Route
+    verbs = ['GET', 'POST']
+    list_routes = [WSock('/ws/{id_resource}', handle_route),
+                   Route('/{id_resource}',    handle_route, methods = verbs),
+                   Route('/',                 handle_route, methods = verbs)]
+
+    exceptions  = {204: handle_route,
+                   404: handle_route,
+                   500: handle_route}
+
+    list_middleware = [starlette.middleware.Middleware(
+                              starlette.middleware.sessions.SessionMiddleware,
+                              secret_key = cfg['session_key'])]
 
     app = starlette.applications.Starlette(debug              = True,
                                            routes             = list_routes,
                                            exception_handlers = exceptions,
                                            middleware         = list_middleware)
 
-    app.state.map_queue_notify = collections.defaultdict(list)
-    app.state.map_resources    = dict()
+    # Map from id_resource to id_topic
+    # When a resource changes, this is
+    # used to determine which queries
+    # need to be notified.
+    #
+    app.state.map_resource_to_topic = collections.defaultdict(set)
+    app.state.map_topic_to_resource = collections.defaultdict(set)
+    app.state.map_topic_to_queue    = collections.defaultdict(set)
+
+    # Map from id_resource to resource
+    app.state.map_resources = dict()
+
     for (key, value) in map_queues.items():
         setattr(app.state, key, value)
     app.state.ts_last_update = 0.0
-    app.state.default        = None
+    app.state.default        = _DEFAULT_DOC
 
     uvicorn.run(app, host  = cfg['host'],
                      port  = cfg['port'],

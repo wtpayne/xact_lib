@@ -10,6 +10,7 @@ python         = ">=3.6.1"
 xact           = { path = '/media/wtp/Data/dev/xact' }
 dominate       = "*"
 pyyaml         = "*"
+ariadne        = "*"
 dill           = "*"
 loguru         = "*"
 sse_starlette  = "*"

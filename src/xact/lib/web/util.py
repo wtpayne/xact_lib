@@ -5,13 +5,29 @@ Web utilities.
 """
 
 
+import collections
+import hashlib
+import json
+
 import dominate
 
-import collections
+import xact.util
+
+
+# -----------------------------------------------------------------------------
+def urlsafe_uid(prefix = 'r', num_chars = None):
+    """
+    Return a new unique url-safe (base16 encoded) GUID.
+
+    """
+    uid = prefix + base64.b32encode(uuid.uuid4().bytes).decode('utf-8')
+    if num_chars is not None:
+        uid = uid[:num_chars]
+    return uid.lower()
 
 
 # =============================================================================
-class ResMap(collections.abc.Mapping):
+class ResMap(collections.abc.MutableMapping):
     """
     Class representing a mapping of id_resource to (media_type, content) pairs.
 
@@ -31,9 +47,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of HTML resources.
 
         """
-        self._add(media_type = 'text/html',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'text/html',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def css(self, default = None, **kwargs):
@@ -48,9 +64,9 @@ class ResMap(collections.abc.Mapping):
             else:
                 map_routes[key] = value
 
-        self._add(media_type = 'text/css',
-                  default    = default,
-                  **map_routes)
+        self.add(media_type = 'text/css',
+                 default    = default,
+                 **map_routes)
 
     # -------------------------------------------------------------------------
     def svg(self, default = None, **kwargs):
@@ -58,9 +74,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of SVG resources.
 
         """
-        self._add(media_type = 'text/svg',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'text/svg',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def js(self, default = None, **kwargs):
@@ -68,9 +84,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of Javascript resources.
 
         """
-        self._add(media_type = 'text/javascript',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'text/javascript',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def png(self, default = None, **kwargs):
@@ -78,9 +94,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of png image resources.
 
         """
-        self._add(media_type = 'image/png',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'image/png',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def woff(self, default = None, **kwargs):
@@ -88,9 +104,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of woff font resources.
 
         """
-        self._add(media_type = 'font/woff',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'font/woff',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def woff2(self, default = None, **kwargs):
@@ -98,9 +114,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of woff2 font resources.
 
         """
-        self._add(media_type = 'font/woff2',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'font/woff2',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def ttf(self, default = None, **kwargs):
@@ -108,9 +124,9 @@ class ResMap(collections.abc.Mapping):
         Add a set of ttf font resources.
 
         """
-        self._add(media_type = 'application/octet-stream',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'application/octet-stream',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
     def callable(self, default = None, **kwargs):
@@ -118,12 +134,26 @@ class ResMap(collections.abc.Mapping):
         Add a set of callables that return resources.
 
         """
-        self._add(media_type = 'callable',
-                  default    = default,
-                  **kwargs)
+        self.add(media_type = 'callable',
+                 default    = default,
+                 **kwargs)
 
     # -------------------------------------------------------------------------
-    def _add(self, media_type, default = None, **kwargs):
+    def topic(self, default = None, **kwargs):
+        """
+        Add a topic.
+
+        """
+        map_routes = dict()
+        for (key, value) in kwargs.items():
+            map_routes[key] = ' '.join(value)
+
+        self.add(media_type = 'topic',
+                 default    = default,
+                 **map_routes)
+
+    # -------------------------------------------------------------------------
+    def add(self, media_type, default = None, **kwargs):
         """
         Add a set of routes with the specified media_type.
 
@@ -166,6 +196,14 @@ class ResMap(collections.abc.Mapping):
         return self._map.keys()
 
     # -------------------------------------------------------------------------
+    def __len__(self):
+        """
+        Return the number of routes in the map.
+
+        """
+        return len(self._map)
+
+    # -------------------------------------------------------------------------
     def __getitem__(self, key):
         """
         Return the content corresponding to the specified route key.
@@ -177,21 +215,38 @@ class ResMap(collections.abc.Mapping):
         return (media_type, obj)
 
     # -------------------------------------------------------------------------
-    def __len__(self):
+    def __setitem__(self, key, value):
         """
-        Return the number of routes in the map.
+        Set the content corresponding to the specified route key.
 
         """
-        return len(self._map)
+        self._map[key] = value
+
+    # -------------------------------------------------------------------------
+    def __delitem__(self, key):
+        """
+        Delete the content corresponding to the specified route key.
+
+        """
+        del self._map[key]
+
+
+    # -------------------------------------------------------------------------
+    def update(self, other):
+        """
+        Update the ResMap from the specified other ResMap
+
+        """
+        self._map.update(other._map)
 
 
 # -----------------------------------------------------------------------------
-def url(id_resource):
+def cla(*args):
     """
-    Return the URL for the specified resource id.
+    Return a dict suitable for setting tailwind classes.
 
     """
-    return '/req/' + id_resource
+    return {'_class': ' '.join(args)}
 
 
 # =============================================================================

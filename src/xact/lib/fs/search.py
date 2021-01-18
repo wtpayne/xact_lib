@@ -185,7 +185,7 @@ def _dirname_regex_filter(os_walk,
     ...
 
     """
-    dirname_indicator_func = _get_dual_regex_indicator_fcn(excl = excl)
+    dirname_indicator_func = get_dual_regex_indicator_fcn(excl = excl)
     return _dirname_filter(os_walk, dirname_indicator_func)
 
 
@@ -224,12 +224,12 @@ def _filepath_regex_filter(iter_filepaths,
     ...
 
     """
-    filepath_indicator_func = _get_dual_regex_indicator_fcn(incl, excl)
+    filepath_indicator_func = get_dual_regex_indicator_fcn(incl, excl)
     return (path for path in iter_filepaths if filepath_indicator_func(path))
 
 
 # -----------------------------------------------------------------------------
-def _get_dual_regex_indicator_fcn(incl=None, excl=None):
+def get_dual_regex_indicator_fcn(incl=None, excl=None):
     """
     Indicator function for strings based on a pair of compiled regexes.
 
