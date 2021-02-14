@@ -80,7 +80,7 @@ def _insert(cursor, name_table, dict_data, reo_key):
         sql = _insert_row(name_table, dict_data, tup_name_column, irow)
         cursor.execute(sql)
 
-    # outputs['clock']['ts'] =
+    # outputs['control']['ts'] =
 
 
 # -----------------------------------------------------------------------------

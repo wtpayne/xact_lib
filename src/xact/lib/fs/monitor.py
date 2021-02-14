@@ -20,6 +20,7 @@ import watchdog.events
 
 import xact.lib.fs.search
 import xact.sys.exception
+import xact.util
 
 
 # -----------------------------------------------------------------------------
@@ -46,11 +47,17 @@ def step(inputs, state, outputs):
     Step the filesystem monitor component.
 
     """
-    outputs['filepath'].clear()
-    outputs['filepath']['ena'] = False
+    xact.util.clear_outputs(
+                    outputs             = outputs,
+                    list_name_output    = ('filepath',),
+                    list_field_to_clear = ('list', ))
+
+    if not inputs['control']['ena']:
+        return
+
     outputs['filepath']['list'] = next(state['generator'])
     if outputs['filepath']['list']:
-        outputs['filepath']['ena']  = True
+        outputs['filepath']['ena'] = True
 
 
 # -----------------------------------------------------------------------------

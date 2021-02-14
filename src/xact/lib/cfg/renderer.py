@@ -18,7 +18,7 @@ def reset(runtime, cfg, inputs, state, outputs):
     Reset the filesystem walk component.
 
     """
-    state['font_color']    = cfg.get('font_color',    '#000000')
+    state['font_color']    = cfg.get('font_color',    '#808080')
     state['font_name']     = cfg.get('font_name',     'tecnico.fino.ttf')
     state['font_size']     = cfg.get('font_size',     '8')
 
@@ -26,11 +26,11 @@ def reset(runtime, cfg, inputs, state, outputs):
     state['graph_nodesep'] = cfg.get('graph_nodesep', '0.2')
     state['graph_ranksep'] = cfg.get('graph_ranksep', '0.3')
 
-    state['node_color']    = cfg.get('node_color',    '#000000')
+    state['node_color']    = cfg.get('node_color',    '#808080')
     state['node_width']    = cfg.get('node_width',    '1.5')
     state['node_height']   = cfg.get('node_height',   '0.5')
 
-    state['edge_color']    = cfg.get('node_color',    '#000000')
+    state['edge_color']    = cfg.get('node_color',    '#808080')
 
 
 # -----------------------------------------------------------------------------
@@ -94,6 +94,7 @@ def _svg_dot_graph(cfg, state):
         with dot.subgraph(
                 name       = 'cluster_' + id_host,
                 graph_attr = { 'style': 'rounded',
+                               'pad':   '10',
                                'color': state['node_color'],
                                'label': id_host}) as host:
 
@@ -105,6 +106,7 @@ def _svg_dot_graph(cfg, state):
                 with host.subgraph(
                         name       = 'cluster_' + id_proc,
                         graph_attr = { 'style': 'rounded',
+                                       'pad':   '10',
                                        'color': state['node_color'],
                                        'label': id_proc}) as process:
 

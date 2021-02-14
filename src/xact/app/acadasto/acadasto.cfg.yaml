@@ -1,5 +1,5 @@
 system:
-  id_system: xact_graph
+  id_system: acadasto
 
 
 ###############################################################################
@@ -17,11 +17,7 @@ host:
 
 ###############################################################################
 process:
-  reader_process:
-    host: localhost
-  worker_process:
-    host: localhost
-  server_process:
+  main_process:
     host: localhost
 
 
@@ -30,26 +26,26 @@ node:
 
   # ---------------------------------------------------------------------------
   controller:
-    process:        reader_process
+    process:        main_process
     req_host_cfg:   default_configuration
     functionality:
       py_module:    xact.lib.util.simple_controller
     state_type:     py_dict
     config:
-      frequency_hz: 10
+      frequency_hz: 0.25
 
   # ---------------------------------------------------------------------------
   fs_monitor:
-    process:        reader_process
+    process:        main_process
     req_host_cfg:   default_configuration
     functionality:
       py_module:    xact.lib.fs.monitor
     state_type:     py_dict
     config:
       dirpath_root:
-        - /media/wtp/Data/dev/xact_lib/src/xact/app/
+        - /media/wtp/Data/ref
       pathincl:
-        - !regex '^.*.cfg.yaml$'
+        - !regex '^.*.pdf$'
       direxcl:
         - !regex '^\..*$'
         - !regex '^.*\.egg-info$'
@@ -59,106 +55,107 @@ node:
         - !regex '^\.tox$'
         - !regex '^\.vagrant$'
         - !regex '^__pycache__$'
-      batch_size:    50
+      batch_size:    1
       changes:       True
       static_files:  True
-      repeat_static: False
+      repeat_static: True
       halt_after:    False
 
   # ---------------------------------------------------------------------------
-  cfg_reader:
-    process:        reader_process
+  ocr_cache_pre:
+    process:        main_process
     req_host_cfg:   default_configuration
     functionality:
-      py_module:    xact.lib.cfg.reader
-    state_type:     py_dict
-
-  # ---------------------------------------------------------------------------
-  svg_renderer:
-    process:        worker_process
-    req_host_cfg:   default_configuration
-    functionality:
-      py_module:    xact.lib.cfg.renderer
-    state_type:     py_dict
-
-  # ---------------------------------------------------------------------------
-  page_generator:
-    process:        worker_process
-    req_host_cfg:   default_configuration
-    functionality:
-      py_module:    xact.app.xact_graph.cfg_graph_display
-    state_type:     py_dict
-
-  # ---------------------------------------------------------------------------
-  htmx:
-    process:        worker_process
-    req_host_cfg:   default_configuration
-    functionality:
-      py_module:    xact.lib.ui.web.resource_from_file
+      py_module:    xact.lib.util.live_reload
     state_type:     py_dict
     config:
-      id_resource:  htmx
-      media_type:   text/javascript
-      filepath:     /media/wtp/Data/dev/oss/htmx/src/htmx.js
+      py_module:    xact.lib.cache.pre
+      filepath_db:  /media/wtp/Data/tmp/acadasto_cache.db
 
   # ---------------------------------------------------------------------------
-  resource_merge:
-    process:        server_process
+  pdf_renderer:
+    process:        main_process
     req_host_cfg:   default_configuration
     functionality:
-      py_module:    xact.lib.util.merge_list
-    state_type:     py_dict
-
-  # ---------------------------------------------------------------------------
-  webserver:
-    process:        server_process
-    req_host_cfg:   default_configuration
-    functionality:
-      py_module:    xact.lib.web.server
+      py_module:    xact.lib.util.live_reload
     state_type:     py_dict
     config:
-      host:         0.0.0.0
-      port:         8080
-      session_key:  7A8F&+ey789dfgh+32d233shja67s843g1
-      debug:        False
+      py_module:    xact.lib.pdf.renderer
+
+
+  # ---------------------------------------------------------------------------
+  ocr:
+    process:        main_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.live_reload
+    state_type:     py_dict
+    config:
+      py_module:    xact.lib.ocr.tesseract
+
+  # ---------------------------------------------------------------------------
+  ocr_cache_post:
+    process:        main_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.live_reload
+    state_type:     py_dict
+    config:
+      py_module:    xact.lib.cache.post
+      filepath_db:  /media/wtp/Data/tmp/acadasto_cache.db
+
+  # ---------------------------------------------------------------------------
+  nlp:
+    process:        main_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.live_reload
+    state_type:     py_dict
+    config:
+      py_module:    xact.lib.nlp.processor
 
 
 ###############################################################################
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   fs_monitor.inputs.clock
+  src:   controller.outputs.control
+  dst:   fs_monitor.inputs.control
 
 - owner: fs_monitor
   data:  py_dict
   src:   fs_monitor.outputs.filepath
-  dst:   cfg_reader.inputs.filepath
+  dst:   ocr_cache_pre.inputs.parameters
 
-- owner: cfg_reader
+- owner: ocr_cache_pre
   data:  py_dict
-  src:   cfg_reader.outputs.cfg
-  dst:   svg_renderer.inputs.cfg
+  src:   ocr_cache_pre.outputs.params_compute
+  dst:   pdf_renderer.inputs.filepath
 
-- owner: svg_renderer
+- owner: ocr_cache_pre
   data:  py_dict
-  src:   svg_renderer.outputs.svg
-  dst:   page_generator.inputs.svg
+  src:   ocr_cache_pre.outputs.params_cache
+  dst:   ocr_cache_post.inputs.parameters
 
-- owner: resource_merge
+- owner: ocr_cache_pre
   data:  py_dict
-  src:   page_generator.outputs.resources
-  dst:   resource_merge.inputs.resources_00
+  src:   ocr_cache_pre.outputs.cached_results
+  dst:   ocr_cache_post.inputs.cached_results
 
-- owner: resource_merge
+- owner: pdf_renderer
   data:  py_dict
-  src:   htmx.outputs.resources
-  dst:   resource_merge.inputs.resources_02
+  src:   pdf_renderer.outputs.image
+  dst:   ocr.inputs.image
 
-- owner: resource_merge
+- owner: ocr
   data:  py_dict
-  src:   resource_merge.outputs.resources
-  dst:   webserver.inputs.resources
+  src:   ocr.outputs.chunk
+  dst:   ocr_cache_post.inputs.computed_results
+
+- owner: ocr_cache_post
+  data:  py_dict
+  src:   ocr_cache_post.outputs.results
+  dst:   nlp.inputs.chunk
 
 
 ###############################################################################

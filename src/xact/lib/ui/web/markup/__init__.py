@@ -72,7 +72,7 @@ def _monkeypatch_dominate(dom_tag):
 
         """
         (attribute, value) = cls._clean_pair_orig(attribute, value)
-        if attribute == 'class':
+        if attribute in ('class', 'data-script'):
             if isinstance(value, tuple) or isinstance(value, list):
                 value = ' '.join(value)
         return (attribute, value)

@@ -179,16 +179,16 @@ def _add_controller(cfg, subordinate_nodes, max_idx):
     xact.cfg.builder.add_edge(
                         cfg     = cfg,
                         id_src  = 'controller',
-                        src_ref = 'outputs.clock',
+                        src_ref = 'outputs.control',
                         id_dst  = 'controller_tee',
-                        dst_ref = 'inputs.clock',
+                        dst_ref = 'inputs.control',
                         data    = 'python_dict')
 
     for (idx, id_node) in enumerate(subordinate_nodes):
         xact.cfg.builder.add_edge(
                         cfg     = cfg,
                         id_src  = 'controller_tee',
-                        src_ref = 'outputs.clock_{idx:03d}'.format(idx = idx),
+                        src_ref = 'outputs.control_{idx:03d}'.format(idx = idx),
                         id_dst  = id_node,
-                        dst_ref = 'inputs.clock',
+                        dst_ref = 'inputs.control',
                         data    = 'python_dict')

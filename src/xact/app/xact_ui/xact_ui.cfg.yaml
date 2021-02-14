@@ -1,0 +1,223 @@
+system:
+  id_system: xact_ui
+
+
+###############################################################################
+host:
+  localhost:
+    hostname:        'localhost'
+    acct_run:        'wtp'
+    acct_provision:  'wtp'
+    port_range:      '8090-9000'
+    dirpath_log:     '/var/log/xact'
+    dirpath_install: '/home/wtp/dev/xact/'
+    dirpath_venv:    '/home/wtp/dev/venv/'    # /opt/xact
+    log_level:       'TRACE'
+
+
+###############################################################################
+process:
+  reader_process:
+    host: localhost
+  worker_process:
+    host: localhost
+  server_process:
+    host: localhost
+
+
+###############################################################################
+node:
+
+  # ---------------------------------------------------------------------------
+  controller:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.simple_controller
+    state_type:     py_dict
+    config:
+      frequency_hz: 10
+
+  # ---------------------------------------------------------------------------
+  fs_monitor:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.fs.monitor
+    state_type:     py_dict
+    config:
+      dirpath_root:
+        - /media/wtp/Data/dev/xact_lib/src/xact/app/
+      pathincl:
+        - !regex '^.*.cfg.yaml$'
+      direxcl:
+        - !regex '^\..*$'
+        - !regex '^.*\.egg-info$'
+        - !regex '^.pytest-cache$'
+        - !regex '^\.cache$'
+        - !regex '^\.git$'
+        - !regex '^\.tox$'
+        - !regex '^\.vagrant$'
+        - !regex '^__pycache__$'
+      batch_size:    50
+      changes:       True
+      static_files:  True
+      repeat_static: False
+      halt_after:    False
+
+  # ---------------------------------------------------------------------------
+  filepath_tee:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.tee
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  cfg_reader:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.cfg.reader
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  metadata_reader:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.vcs.metadata_reader
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  svg_renderer:
+    process:        worker_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.cfg.renderer
+    state_type:     py_dict
+
+  # ---------------------------------------------------------------------------
+  ui_renderer:
+    process:        worker_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.util.live_reload
+    state_type:     py_dict
+    config:
+      py_module:    xact.app.xact_ui.xact_ui_component
+
+  # ---------------------------------------------------------------------------
+  static_files:
+    process:        reader_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.ui.web.resource_from_file
+    state_type:     py_dict
+    config:
+      list:
+      - id_resource:  htmx
+        media_type:   text/javascript
+        is_binary:    false
+        filepath:     /media/wtp/Data/dev/oss/htmx/src/htmx.js
+      - id_resource:  hyperscript
+        media_type:   text/javascript
+        is_binary:    false
+        filepath:     /media/wtp/Data/dev/oss/_hyperscript/src/_hyperscript.js
+      - id_resource:  tecnicofino
+        media_type:   font/woff2
+        is_binary:    true
+        filepath:     /media/wtp/Data/dev/xact_web/src/xact/web/static/tecnico.fino-webfont.woff2
+
+  # ---------------------------------------------------------------------------
+  webserver:
+    process:        server_process
+    req_host_cfg:   default_configuration
+    functionality:
+      py_module:    xact.lib.web.server
+    state_type:     py_dict
+    config:
+      host:         0.0.0.0
+      port:         8080
+      session_key:  7A8F&+ey789dfgh+32d233shja67s843g1
+      debug:        True
+
+
+###############################################################################
+edge:
+- owner: controller
+  data:  py_dict
+  src:   controller.outputs.control_00
+  dst:   fs_monitor.inputs.control
+
+- owner: controller
+  data:  py_dict
+  src:   controller.outputs.control_01
+  dst:   static_files.inputs.control
+
+- owner: fs_monitor
+  data:  py_dict
+  src:   fs_monitor.outputs.filepath
+  dst:   filepath_tee.inputs.filepath
+
+- owner: filepath_tee
+  data:  py_dict
+  src:   filepath_tee.outputs.filepath_00
+  dst:   cfg_reader.inputs.filepath
+
+- owner: filepath_tee
+  data:  py_dict
+  src:   filepath_tee.outputs.filepath_01
+  dst:   metadata_reader.inputs.filepath
+
+- owner: metadata_reader
+  data:  py_dict
+  src:   metadata_reader.outputs.metadata
+  dst:   ui_renderer.inputs.metadata
+
+- owner: cfg_reader
+  data:  py_dict
+  src:   cfg_reader.outputs.cfg
+  dst:   svg_renderer.inputs.cfg
+
+- owner: svg_renderer
+  data:  py_dict
+  src:   svg_renderer.outputs.svg
+  dst:   ui_renderer.inputs.svg
+
+- owner: static_files
+  data:  py_dict
+  src:   static_files.outputs.resources
+  dst:   webserver.inputs.resources_00
+
+- owner: ui_renderer
+  data:  py_dict
+  src:   ui_renderer.outputs.resources
+  dst:   webserver.inputs.resources_01
+
+
+###############################################################################
+data:
+  py_dict:  py_dict
+  py_str:   py_str
+
+
+###############################################################################
+req_host_cfg:
+  default_configuration:
+    role:
+      - default_role
+
+
+###############################################################################
+role:
+  default_role:
+    tasks:
+      - name: Update apt-get repo and cache
+        become:        yes
+        become_user:   root
+        become_method: sudo
+        apt:
+          update_cache:     yes
+          force_apt_get:    yes
+          cache_valid_time: 3600

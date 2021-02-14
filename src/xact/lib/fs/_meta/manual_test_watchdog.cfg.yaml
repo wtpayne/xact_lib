@@ -63,8 +63,8 @@ node:
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   watchdog.inputs.clock
+  src:   controller.outputs.control
+  dst:   watchdog.inputs.control
 
 - owner: watchdog
   data:  py_dict

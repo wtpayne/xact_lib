@@ -43,12 +43,12 @@ def step(inputs, state, outputs):
                     list_name_output    = ('id_ui', 'id_subs', 'resources'),
                     list_field_to_clear = ('list', ))
 
-    if not inputs['clock']['ena']:
+    if not inputs['control']['ena']:
         return
 
-    ts           = inputs['clock']['ts']
+    ts           = inputs['control']['ts']
     microseconds = int(1000000 * (ts % 1))
-    tup_time     = (*inputs['clock']['gmtime'][:6], microseconds)
+    tup_time     = (*inputs['control']['gmtime'][:6], microseconds)
     timestamp    = datetime.datetime(*tup_time).isoformat()
 
     vega_lite_spec = {

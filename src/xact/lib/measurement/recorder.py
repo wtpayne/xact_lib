@@ -59,8 +59,8 @@ def step(inputs, state, outputs):
     Step the data recorder.
 
     """
-    assert inputs['clock']['ena']
-    file = xact.lib.measurement.file_rec(idx   = inputs['clock']['idx'],
+    assert inputs['control']['ena']
+    file = xact.lib.measurement.file_rec(idx   = inputs['control']['idx'],
                                          state = state,
                                          mode  = 'wb')
     for key in outputs.keys():

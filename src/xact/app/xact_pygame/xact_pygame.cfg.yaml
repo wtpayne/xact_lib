@@ -49,8 +49,8 @@ node:
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   pygame.inputs.clock
+  src:   controller.outputs.control
+  dst:   pygame.inputs.control
 
 
 ###############################################################################

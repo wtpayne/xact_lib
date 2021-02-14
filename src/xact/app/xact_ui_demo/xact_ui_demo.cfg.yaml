@@ -139,20 +139,20 @@ node:
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   controller_tee.inputs.clock
+  src:   controller.outputs.control
+  dst:   controller_tee.inputs.control
 
 # dropdown_menu
 - owner: dropdown_menu
   data:  py_dict
-  src:   controller_tee.outputs.clock_00
-  dst:   dropdown_menu.inputs.clock
+  src:   controller_tee.outputs.control_00
+  dst:   dropdown_menu.inputs.control
 
 # datacard
 - owner: datacard
   data:  py_dict
-  src:   controller_tee.outputs.clock_01
-  dst:   datacard.inputs.clock
+  src:   controller_tee.outputs.control_01
+  dst:   datacard.inputs.control
 
 - owner: datacard
   data:  py_dict

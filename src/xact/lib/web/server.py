@@ -27,6 +27,7 @@ import starlette.background
 import starlette.exceptions
 import starlette.middleware
 import starlette.middleware.sessions
+import starlette.requests
 import starlette.responses
 import starlette.routing
 import starlette.websockets
@@ -83,23 +84,17 @@ def step(inputs, state, outputs):
     Update the ASGI server and pass on any new requests from the client.
 
     """
-    if 'time' in inputs and inputs['time']['ena']:
-        gmtime = inputs['time']['gmtime']
-        ts     = inputs['time']['ts']
-    else:
-        gmtime = None
-        ts     = None
-
     # Updated resources from xact-backend to ASGI-server.
-    if inputs['resources']['ena']:
-        accumulator = dict()
-        for map_res in inputs['resources']['list']:
-            _remove_duplicates(map_res, state['map_hashes'])
-            accumulator.update(map_res)
-        try:
-            state['queue_resources'].put(accumulator, block = False)
-        except queue.Full:
-            pass # TODO: LOG SOME SORT OF ERROR?
+    for key in inputs.keys():
+        if inputs[key]['ena']:
+            accumulator = dict()
+            for map_res in inputs[key]['list']:
+                _remove_duplicates(map_res, state['map_hashes'])
+                accumulator.update(map_res)
+            try:
+                state['queue_resources'].put(accumulator, block = False)
+            except queue.Full:
+                pass # TODO: LOG SOME SORT OF ERROR?
 
     # Client data from ASGI-server to xact-backend.
     if 'requests' in outputs:
@@ -109,9 +104,7 @@ def step(inputs, state, outputs):
         try:
             map_requests = state['queue_requests'].get(block = False)
             if 'requests' in outputs:
-                outputs['requests']['ena']    = True
-                outputs['requests']['ts']     = ts
-                outputs['requests']['gmtime'] = gmtime
+                outputs['requests']['ena'] = True
                 outputs['requests']['list'].append(map_requests)
         except queue.Empty:
             break
@@ -129,7 +122,12 @@ def _remove_duplicates(map_res, map_hashes):
         (media_type, obj) = map_res[route]
         hash = hashlib.md5()
         hash.update(media_type.encode('utf-8'))
-        hash.update(obj.encode('utf-8'))
+
+        if isinstance(obj, bytes):
+            hash.update(obj)
+        else:
+            hash.update(obj.encode('utf-8'))
+
         digest = hash.hexdigest()
 
         if route in map_hashes and digest == map_hashes[route]:
@@ -182,9 +180,9 @@ def _asgi_server_process(cfg, map_queues):
             return None
 
         # HTTP request to a callback "resource".
-        if media_type in ('callback',):
+        if media_type == 'async':
             callback = _load_callback(media_type, content)
-            (media_type, content) = callback(request)
+            (media_type, content) = await callback(request)
 
         response = starlette.responses.Response(media_type = media_type,
                                                 content    = content,
@@ -346,21 +344,14 @@ def _asgi_server_process(cfg, map_queues):
         """
         headers      = dict(request.headers)
         request_data = dict(id_resource     = str(id_resource),
-                           id_session      = str(id_session),
-                           id_user         = str(id_user),
-                           client_ip       = request['client'][0],
-                           url             = str(request.url),
-                           accept          = headers['accept'],
-                           accept_encoding = headers['accept-encoding'],
-                           accept_language = headers['accept-language'],
-                           user_agent      = headers['user-agent'])
-
-        if request.method == 'POST':
-            postdata = await request.body()
-        else:
-            postdata = None
-        if postdata:
-            request_data['postdata'] = postdata
+                            id_session      = str(id_session),
+                            id_user         = str(id_user),
+                            client_ip       = request['client'][0],
+                            url             = str(request.url),
+                            accept          = headers['accept'],
+                            accept_encoding = headers['accept-encoding'],
+                            accept_language = headers['accept-language'],
+                            user_agent      = headers['user-agent'])
 
         query_params = request.query_params
         for key in query_params.keys():
@@ -405,6 +396,7 @@ def _asgi_server_process(cfg, map_queues):
         queue_notify = asyncio.Queue()
         app.state.map_topic_to_queue[id_topic].add(queue_notify)
         response = sse_starlette.sse.EventSourceResponse(
+                            # media_type = 'text/event-stream',
                             content    = _generate_change_notifications(
                                                     request, queue_notify),
                             background = tasks)
@@ -520,8 +512,9 @@ def _asgi_server_process(cfg, map_queues):
     app.state.ts_last_update = 0.0
     app.state.default        = _DEFAULT_DOC
 
-    uvicorn.run(app, host  = cfg['host'],
-                     port  = cfg['port'],
-                     debug = cfg['debug'])
+    uvicorn.run(app, host      = cfg['host'],
+                     port      = cfg['port'],
+                     log_level = 'error',
+                     debug     = cfg['debug'])
 
 

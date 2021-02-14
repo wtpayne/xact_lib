@@ -22,7 +22,7 @@ def step(inputs, state, outputs):
     """
     outputs['bus'].clear()
     for (key, value) in inputs.items():
-        if key == 'clock':
+        if key == 'control':
             continue
         outputs['bus'][key] = dict()
         outputs['bus'][key].update(value)

@@ -35,6 +35,14 @@ def tag(_params = dict(), _type = 'div', _class = tuple()):
     else:
         _params['_class'] += (_class,)
 
+    # Extend hyperscript definitions
+    if 'data_script' not in _params:
+        _params['data_script'] = ()
+    if isinstance(data_script, tuple):
+        _params['data_script'] += data_script
+    else:
+        _params['data_script'] += (data_script,)
+
     tag_type = _params.pop('_type', _type)
 
     return globals()[tag_type](*iter_content, **_params)

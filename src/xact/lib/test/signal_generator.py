@@ -23,7 +23,7 @@ def step(inputs, state, outputs):
 
     """
     for channel in state['channels']:
-        offset       = inputs['clock']['idx'] % channel['num_samples']
+        offset       = inputs['control']['idx'] % channel['num_samples']
         sample_value = channel['signal'][offset]
 
         path   = channel['path']

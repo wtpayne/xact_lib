@@ -29,7 +29,7 @@ def step(inputs, state, outputs):
     Step the entity renderer component.
 
     """
-    if not inputs['clock']['ena']:
+    if not inputs['control']['ena']:
         return
 
     list_entities = [{'id':         'A',

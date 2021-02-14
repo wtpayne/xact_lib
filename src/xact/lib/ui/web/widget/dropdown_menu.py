@@ -31,7 +31,7 @@ def step(inputs, state, outputs):
                     list_name_output    = ('id_ui', 'id_subs', 'resources'),
                     list_field_to_clear = ('list', ))
 
-    if not inputs['clock']['ena']:
+    if not inputs['control']['ena']:
         return
 
     list_params = [{'_content': 'Item A', 'href': '#0'},

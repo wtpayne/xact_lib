@@ -19,10 +19,12 @@ def reset(runtime, cfg, inputs, state, outputs):
     Reset the xact component.
 
     """
-    state['id_resource']   = cfg['id_resource']
-    state['media_type']    = cfg['media_type']
-    state['filepath']      = cfg['filepath']
-    state['last_modified'] = 0
+    state['list'] = list()
+    for cfg_item in cfg['list']:
+        state_item = dict()
+        state_item.update(cfg_item)
+        state_item['last_modified'] = 0
+        state['list'].append(state_item)
 
 
 # -----------------------------------------------------------------------------
@@ -36,17 +38,28 @@ def step(inputs, state, outputs):
                     list_name_output    = ('resources',),
                     list_field_to_clear = ('list', ))
 
-    modified = os.path.getmtime(state['filepath'])
-    if state['last_modified'] >= modified:
+    if not inputs['control']['ena']:
         return
-    state['last_modified'] = modified
 
     map_res = xact.lib.web.util.ResMap()
-    with open(state['filepath'], 'rt') as file:
-        map_res.add(media_type = state['media_type'],
-                    **{state['id_resource']: file.read()})
+    for state_item in state['list']:
 
-    # Resources to publish.
-    outputs['resources']['ena']  = True
-    outputs['resources']['list'] = [dict(map_res)]
+        modified = os.path.getmtime(state_item['filepath'])
+        if state_item['last_modified'] >= modified:
+            return
+        state_item['last_modified'] = modified
+
+        if state_item['is_binary']:
+            mode_file = 'rb'
+        else:
+            mode_file = 'rt'
+
+        with open(state_item['filepath'], mode_file) as file:
+            map_res.add(media_type = state_item['media_type'],
+                        **{state_item['id_resource']: file.read()})
+
+
+    if map_res:
+        outputs['resources']['ena']  = True
+        outputs['resources']['list'] = [dict(map_res)]
 

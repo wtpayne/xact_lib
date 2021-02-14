@@ -26,35 +26,32 @@ def page(title, id_topic, list_id_ui):
         html.meta(name    = 'viewport',
                   content = 'width=device-width, initial-scale=1.0')
 
-        html.link(rel     = 'stylesheet',
-                  href    = ('https://fonts.googleapis.com/css2'
-                             '?family=Roboto:wght@100;300;900&display=swap'))
+        # html.link(rel     = 'stylesheet',
+        #           href    = ('https://fonts.googleapis.com/css2'
+        #                      '?family=Roboto:wght@100;300;900&display=swap'))
 
         # TAILWIND
         html.link(rel     = 'stylesheet',
                   href    = ('https://unpkg.com/tailwindcss'
                              '@^2/dist/tailwind.min.css'))
 
+        html.script(type  = 'text/javascript',
+                    src   = '/htmx')
+        html.script(type  = 'text/javascript',
+                    src   = '/xact_htmx_extension')
+        html.script(type  = 'text/javascript',
+                    src   = '/hyperscript')
+
         # VEGA LITE
-        html.script(type = 'text/javascript',
-                    src  = 'https://cdn.jsdelivr.net/npm/vega@5')
-        html.script(type = 'text/javascript',
-                    src  = 'https://cdn.jsdelivr.net/npm/vega-lite@4')
-        html.script(type = 'text/javascript',
-                    src  = 'https://cdn.jsdelivr.net/npm/vega-embed@6')
+        # html.script(type = 'text/javascript',
+        #             src  = 'https://cdn.jsdelivr.net/npm/vega@5')
+        # html.script(type = 'text/javascript',
+        #             src  = 'https://cdn.jsdelivr.net/npm/vega-lite@4')
+        # html.script(type = 'text/javascript',
+        #             src  = 'https://cdn.jsdelivr.net/npm/vega-embed@6')
 
         # html.script(type  = 'text/javascript',
         #             src   = "https://d3js.org/d3.v6.min.js")
-
-        # html.script(type  = 'text/javascript',
-        #             src   = 'https://unpkg.com/htmx.org@1.0.1')
-        html.script(type  = 'text/javascript',
-                    src   = '/htmx')
-        # html.script(type  = 'text/javascript',
-        #             src   = 'https://unpkg.com/hyperscript.org@0.0.2')
-
-        html.script(type  = 'text/javascript',
-                    src   = '/xact_htmx_extension')
 
         # html.link(rel     = 'stylesheet',
         #           type    = 'text/css',

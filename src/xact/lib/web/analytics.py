@@ -8,7 +8,7 @@ Simple analytics component.
 import textwrap
 import time
 
-import xact.lib.util.clock
+import xact.lib.util.simple_controller
 
 
 #------------------------------------------------------------------------------
@@ -27,11 +27,11 @@ def step(inputs, state, outputs):
 
     """
     outputs['rollup']['ena'] = False
-    if xact.lib.util.clock.is_new_period(inputs, state, 'min'):
+    if xact.lib.util.simple_controller.is_new_period(inputs, state, 'min'):
         st_most_recent = inputs['time']['gmtime']
 
         if state['st_previous'] is None:
-            state['st_previous'] = xact.lib.util.clock.prev_time(
+            state['st_previous'] = xact.lib.util.simple_controller.prev_time(
                                                 st_most_recent, minutes = 1)
 
         sql_query = ' '.join(textwrap.dedent("""

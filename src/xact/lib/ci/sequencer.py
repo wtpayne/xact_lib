@@ -20,7 +20,7 @@ def reset(runtime, cfg, inputs, state, outputs):
 
     """
     state['size_batch']     = cfg.get('size_batch', 1)
-    state['clock']          = None
+    state['control']        = None
     state['priority_queue'] = collections.deque()  # Moves from left to right.
 
 
@@ -34,10 +34,10 @@ def step(inputs, state, outputs):
     outputs['filepath']['ena']  = False
     outputs['filepath']['list'] = []
 
-    if inputs['clock']['ena']:
-        state['clock'] = inputs['clock']
+    if inputs['control']['ena']:
+        state['control'] = inputs['control']
 
-    if state['clock'] is None:
+    if state['control'] is None:
         return
 
     if inputs['low_priority']['ena']:

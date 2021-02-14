@@ -76,8 +76,8 @@ node:
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   walk.inputs.clock
+  src:   controller.outputs.control
+  dst:   walk.inputs.control
 
 - owner: walk
   data:  py_dict

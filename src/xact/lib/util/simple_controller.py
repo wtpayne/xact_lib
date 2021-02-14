@@ -38,13 +38,13 @@ def step(inputs, state, outputs):
         time.sleep(state['period_secs'])
         # TODO: Consider more accurate sleeps, based on elapsed time.
 
-    outputs['clock']['ena']    = True
-    outputs['clock']['idx']    = state['idx']
-    outputs['clock']['ts']     = time.monotonic()
-    outputs['clock']['gmtime'] = time.gmtime()
+    for key in outputs.keys():
+        outputs[key]['ena']    = True
+        outputs[key]['idx']    = state['idx']
+        outputs[key]['ts']     = time.monotonic()
+        outputs[key]['gmtime'] = time.gmtime()
 
     state['idx'] = state['idx'] + 1
-
     if state['max_idx'] is not None:
         if state['idx'] > state['max_idx']:
             raise xact.sys.exception.RunComplete(0)
@@ -67,10 +67,10 @@ def is_new_period(inputs, state, name_period):
     Return true if we are in a new period. False otherwise
 
     """
-    if not inputs['clock']['ena']:
+    if not inputs['control']['ena']:
         return False
 
-    gmt = inputs['clock']['gmtime']
+    gmt = inputs['control']['gmtime']
     if name_period == 'mon':
         id_period = (gmt.tm_year, gmt.tm_mon),
     elif name_period == 'week':

@@ -43,7 +43,7 @@ def inspector_step(inputs, state, outputs):
 
     for (key, data_item) in inputs.items():
 
-        if key == 'clock':
+        if key == 'control':
             continue
 
         if key == 'functions':

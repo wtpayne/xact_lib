@@ -331,28 +331,28 @@ node:
 edge:
 - owner: controller
   data:  py_dict
-  src:   controller.outputs.clock
-  dst:   controller_tee.inputs.clock
+  src:   controller.outputs.control
+  dst:   controller_tee.inputs.control
 
 - owner: controller_tee
   data:  py_dict
-  src:   controller_tee.outputs.clock_00
-  dst:   watchdog.inputs.clock
+  src:   controller_tee.outputs.control_00
+  dst:   watchdog.inputs.control
 
 - owner: controller_tee
   data:  py_dict
-  src:   controller_tee.outputs.clock_01
-  dst:   walk.inputs.clock
+  src:   controller_tee.outputs.control_01
+  dst:   walk.inputs.control
 
 - owner: controller_tee
   data:  py_dict
-  src:   controller_tee.outputs.clock_02
-  dst:   sequencer.inputs.clock
+  src:   controller_tee.outputs.control_02
+  dst:   sequencer.inputs.control
 
 - owner: controller_tee
   data:  py_dict
-  src:   controller_tee.outputs.clock_03
-  dst:   entity.inputs.clock
+  src:   controller_tee.outputs.control_03
+  dst:   entity.inputs.control
 
 - owner: watchdog
   data:  py_dict

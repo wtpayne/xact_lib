@@ -129,12 +129,12 @@ class ResMap(collections.abc.MutableMapping):
                  **kwargs)
 
     # -------------------------------------------------------------------------
-    def callable(self, default = None, **kwargs):
+    def async(self, default = None, **kwargs):
         """
-        Add a set of callables that return resources.
+        Add a set of asynchronous callbacks that return resources.
 
         """
-        self.add(media_type = 'callable',
+        self.add(media_type = 'async',
                  default    = default,
                  **kwargs)
 

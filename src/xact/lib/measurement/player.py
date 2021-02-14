@@ -42,7 +42,7 @@ def step(inputs, state, outputs):
     Step the data recorder.
 
     """
-    assert inputs['clock']['ena']
+    assert inputs['control']['ena']
 
     if state['file'] is None:
         try:
